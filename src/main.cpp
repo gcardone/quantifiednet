@@ -1,4 +1,5 @@
 #include <string>
+#include <iostream>
 #include <argp.h>
 #include <sqlite3.h>
 #include "config.h"
