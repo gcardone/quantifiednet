@@ -6,7 +6,7 @@
 #include <cstdio>
 
 
-std::string join_uint8(const uint8_t* data, const size_t len, const char sep, const bool toHex) {
+std::string JoinUint8(const uint8_t* data, const size_t len, const char sep, const bool toHex) {
   std::ostringstream oss;
   const uint8_t *p = data;
   if (toHex) {
@@ -21,6 +21,14 @@ std::string join_uint8(const uint8_t* data, const size_t len, const char sep, co
   }
   return oss.str();
 }
+
+
+std::string AddrToString(const uint8_t* addr, const size_t len) {
+  char sep = len == 4 ? '.' : ':';
+  bool toHex = len == 4 ? false : true;
+  return JoinUint8(addr, len, sep, toHex);
+}
+
 
 int memeq(const void* s1, const void* s2, size_t n) {
   if (s1 == s2)

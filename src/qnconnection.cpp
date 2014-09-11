@@ -143,10 +143,8 @@ bool QNConnection::operator>=(const QNConnection& o) {
 
 
 std::ostream& operator<<(std::ostream& os, const QNConnection& o) {
-  char sep = o.addrlen_ == 4 ? '.' : ':';
-  bool toHex = o.addrlen_ == 4 ? false : true;
-  std::string string_a = join_uint8(o.addr_a_, o.addrlen_, sep, toHex);
-  std::string string_b = join_uint8(o.addr_b_, o.addrlen_, sep, toHex);
+  std::string string_a = AddrToString(o.addr_a_, o.addrlen_);
+  std::string string_b = AddrToString(o.addr_b_, o.addrlen_);
   os << '[' << string_a << "]:" << o.port_a_ << " <-> [" << string_b << "]:" << o.port_b_;
   return os;
 }
