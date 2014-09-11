@@ -8,7 +8,6 @@
 #include "log.h"
 #include "config.h"
 
-int use_syslog = 0;
 
 static void do_log(const char *prefix, const char *fmt, va_list args);
 
