@@ -37,27 +37,27 @@ QNConnection::QNConnection(const QNConnection& o) {
 }
 
 
-size_t QNConnection::getAddrlen() const {
+size_t QNConnection::addrlen() const {
     return addrlen_;
 }
 
 
-const uint8_t* QNConnection::getAddrA() const {
+const uint8_t* QNConnection::addr_a() const {
     return addr_a_;
 }
 
 
-const uint8_t* QNConnection::getAddrB() const {
+const uint8_t* QNConnection::addr_b() const {
     return addr_b_;
 }
 
 
-uint16_t QNConnection::getPortA() const {
+uint16_t QNConnection::port_a() const {
     return port_a_;
 }
 
 
-uint16_t QNConnection::getPortB() const {
+uint16_t QNConnection::port_b() const {
     return port_b_;
 }
 
