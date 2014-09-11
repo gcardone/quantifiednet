@@ -4,18 +4,18 @@
 #include "util.h"
 
 
-QNConnection::QNConnection(const uint8_t *addr_1, const uint8_t *addr_2, size_t addrlen, uint16_t port_1, uint16_t port_2) {
+QNConnection::QNConnection(const uint8_t *addr_a, const uint8_t *addr_b, size_t addrlen, uint16_t port_1, uint16_t port_2) {
     addr_a_ = new uint8_t[addrlen];
     addr_b_ = new uint8_t[addrlen];
     addrlen_ = addrlen;
-    if (std::memcmp(addr_1, addr_2, addrlen) < 0) {
-        std::copy(addr_1, addr_1 + addrlen, addr_a_);
-        std::copy(addr_2, addr_2 + addrlen, addr_b_);
+    if (std::memcmp(addr_a, addr_b, addrlen) < 0) {
+        std::copy(addr_a, addr_a + addrlen, addr_a_);
+        std::copy(addr_b, addr_b + addrlen, addr_b_);
         port_a_ = port_1;
         port_b_ = port_2;
     } else {
-        std::copy(addr_1, addr_1 + addrlen, addr_b_);
-        std::copy(addr_2, addr_2 + addrlen, addr_a_);
+        std::copy(addr_a, addr_a + addrlen, addr_b_);
+        std::copy(addr_b, addr_b + addrlen, addr_a_);
         port_b_ = port_1;
         port_a_ = port_2;
     }
