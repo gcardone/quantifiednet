@@ -10,7 +10,7 @@ std::string join_uint8(const uint8_t* data, const size_t len, const char sep, co
     std::ostringstream oss;
     const uint8_t *p = data;
     if (toHex) {
-        oss << std::hex;
+        oss << std::hex << std::setfill ('0') << std::setw(2); 
     }
     if (len > 0) {
         oss << int(*p++);
