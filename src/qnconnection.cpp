@@ -5,33 +5,32 @@
 
 
 QNConnection::QNConnection(const uint8_t *addr_a, const uint8_t *addr_b,
-  size_t addrlen, uint16_t port_1, uint16_t port_2) {
-  addr_a_ = new uint8_t[addrlen];
-  addr_b_ = new uint8_t[addrlen];
+  size_t addrlen, uint16_t port_a, uint16_t port_b) :
+    addrlen_(addrlen),
+    addr_a_(new uint8_t[addrlen]),
+    addr_b_(new uint8_t[addrlen]) {
   addrlen_ = addrlen;
   if (std::memcmp(addr_a, addr_b, addrlen) < 0) {
     std::copy(addr_a, addr_a + addrlen, addr_a_);
     std::copy(addr_b, addr_b + addrlen, addr_b_);
-    port_a_ = port_1;
-    port_b_ = port_2;
+    port_a_ = port_a;
+    port_b_ = port_b;
   } else {
     std::copy(addr_a, addr_a + addrlen, addr_b_);
     std::copy(addr_b, addr_b + addrlen, addr_a_);
-    port_b_ = port_1;
-    port_a_ = port_2;
+    port_b_ = port_a;
+    port_a_ = port_b;
   }
 }
 
 
-QNConnection::QNConnection(const QNConnection& o) {
-  if (addrlen_ != o.addrlen_) {
-    delete[] addr_a_;
-    delete[] addr_b_;
-    addrlen_ = o.addrlen_;
-    addr_a_ = new uint8_t[addrlen_];
-    addr_b_ = new uint8_t[addrlen_];
-  }
-  std::copy(o.addr_a_, o.addr_b_ + addrlen_, addr_a_);
+QNConnection::QNConnection(const QNConnection& o) :
+    addrlen_(o.addrlen_),
+    port_a_(o.port_a_),
+    port_b_(o.port_b_),
+    addr_a_(new uint8_t[o.addrlen_]),
+    addr_b_(new uint8_t[o.addrlen_]) {
+  std::copy(o.addr_a_, o.addr_a_ + addrlen_, addr_a_);
   std::copy(o.addr_b_, o.addr_b_ + addrlen_, addr_b_);
   port_a_ = o.port_a_;
   port_b_ = o.port_b_;

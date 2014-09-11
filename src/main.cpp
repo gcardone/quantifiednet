@@ -1,9 +1,14 @@
 #include <string>
 #include <iostream>
+
 #include <argp.h>
 #include <sqlite3.h>
+#include <sys/time.h>
+
 #include "config.h"
 #include "log.h"
+#include "qnconnection.h"
+#include "qnflow.h"
 #include "util.h"
 
 const char *argp_program_version = QUANTIFIEDNET_FULL_VERSION;

@@ -24,11 +24,11 @@ public:
   virtual ~QNConnection();
   friend std::ostream& operator<<(std::ostream& os, const QNConnection& o);
 protected:
-  uint8_t *addr_a_;
-  uint8_t *addr_b_;
+  size_t addrlen_;
   uint16_t port_a_;
   uint16_t port_b_;
-  size_t addrlen_;
+  uint8_t *addr_a_;
+  uint8_t *addr_b_;
 };
 
 #endif
