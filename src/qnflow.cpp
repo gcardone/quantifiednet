@@ -1,11 +1,12 @@
 #include <sstream>
 #include <string>
+#include <arpa/inet.h>
 #include "log.h"
 #include "qnflow.h"
 #include "util.h"
 
-QNFlow::QNFlow(const QNConnection& qnconnection, const struct timeval start_time) :
-    connection(qnconnection),
+QNFlow::QNFlow(const QNConnection& qnconnection, const struct timeval& start_time) :
+    connection_(qnconnection),
     sent_a_(0),
     sent_b_(0),
     start_time_(start_time),
@@ -35,16 +36,31 @@ void QNFlow::AddSentB(uint64_t size) {
 
 
 void QNFlow::AddSent(const uint8_t* addr, uint64_t size) {
-  if (memeq(connection.addr_a(), addr, connection.addrlen())) {
+  if (memeq(connection_.addr_a(), addr, connection_.addrlen())) {
     AddSentA(size);
-  } else if (memeq(connection.addr_b(), addr, connection.addrlen())) {
+  } else if (memeq(connection_.addr_b(), addr, connection_.addrlen())) {
     AddSentB(size);
   } else {
-    std::string straddr = AddrToString(addr, connection.addrlen());
+    std::string straddr = AddrToString(addr, connection_.address_family());
     std::ostringstream oss;
-    oss << connection;
+    oss << connection_;
     std::string strconnection = oss.str();
     err_log("Unable to add %lu bytes to connection %s for address %s", size,
       strconnection.c_str(), straddr.c_str());
   }
 }
+
+
+const QNConnection& QNFlow::connection() {
+    return connection_;
+}
+
+void QNFlow::UpdateEndTime(const struct timeval& end_time) {
+    end_time_ = end_time;
+}
+
+
+void QNFlow::UpdateEndTime() {
+    gettimeofday(&end_time_, NULL);
+}
+

@@ -1,34 +1,28 @@
-#include <cstdlib>
+#include <cstdint>
+#include <exception>
 #include <iostream>
 #include <iomanip>
 #include <sstream>
+
+#include <arpa/inet.h>
+#include <netinet/in.h>
+
 #include "util.h"
-#include <cstdio>
 
 
-std::string JoinUint8(const uint8_t* data, const size_t len, const char sep, const bool toHex) {
-  std::ostringstream oss;
-  const uint8_t *p = data;
-  if (toHex) {
-    oss << std::hex << std::setfill ('0') << std::setw(2); 
+std::string AddrToString(const uint8_t* addr, int af) {
+  char buff[INET6_ADDRSTRLEN];
+  if (af == AF_INET) {
+    if (inet_ntop(AF_INET, addr, buff, INET_ADDRSTRLEN) == NULL) {
+        throw std::exception();
+    }
+  } else if (af == AF_INET6) {
+    if (inet_ntop(AF_INET6, addr, buff, INET6_ADDRSTRLEN) == NULL) {
+        throw std::exception();
+    }
   }
-  if (len > 0) {
-    oss << int(*p++);
-  }
-  while (p < data + len) {
-    oss << sep;
-    oss << int(*p++);
-  }
-  return oss.str();
+  return std::string(buff);
 }
-
-
-std::string AddrToString(const uint8_t* addr, const size_t len) {
-  char sep = len == 4 ? '.' : ':';
-  bool toHex = len == 4 ? false : true;
-  return JoinUint8(addr, len, sep, toHex);
-}
-
 
 int memeq(const void* s1, const void* s2, size_t n) {
   if (s1 == s2)

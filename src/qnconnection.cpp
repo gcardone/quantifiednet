@@ -1,5 +1,7 @@
 #include <algorithm>
 #include <cstring>
+#include <exception>
+#include <arpa/inet.h>
 #include "qnconnection.h"
 #include "util.h"
 
@@ -9,7 +11,9 @@ QNConnection::QNConnection(const uint8_t *addr_a, const uint8_t *addr_b,
     addrlen_(addrlen),
     addr_a_(new uint8_t[addrlen]),
     addr_b_(new uint8_t[addrlen]) {
-  addrlen_ = addrlen;
+  if (addrlen != 4 && addrlen != 16) {
+    throw std::exception();
+  }
   if (std::memcmp(addr_a, addr_b, addrlen) < 0) {
     std::copy(addr_a, addr_a + addrlen, addr_a_);
     std::copy(addr_b, addr_b + addrlen, addr_b_);
@@ -34,6 +38,15 @@ QNConnection::QNConnection(const QNConnection& o) :
   std::copy(o.addr_b_, o.addr_b_ + addrlen_, addr_b_);
   port_a_ = o.port_a_;
   port_b_ = o.port_b_;
+}
+
+
+int QNConnection::address_family() const {
+  if (addrlen_ == 4) {
+    return AF_INET;
+  } else {
+    return AF_INET6;
+  }
 }
 
 
@@ -142,8 +155,8 @@ bool QNConnection::operator>=(const QNConnection& o) {
 
 
 std::ostream& operator<<(std::ostream& os, const QNConnection& o) {
-  std::string string_a = AddrToString(o.addr_a_, o.addrlen_);
-  std::string string_b = AddrToString(o.addr_b_, o.addrlen_);
+  std::string string_a = AddrToString(o.addr_a_, o.address_family());
+  std::string string_b = AddrToString(o.addr_b_, o.address_family());
   os << '[' << string_a << "]:" << o.port_a_ << " <-> [" << string_b << "]:" << o.port_b_;
   return os;
 }

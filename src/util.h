@@ -3,8 +3,7 @@
 
 #include <string>
 
-std::string JoinUint8(const uint8_t* data, const size_t len, const char sep = '.', const bool toHex = false);
-std::string AddrToString(const uint8_t* addr, const size_t len);
+std::string AddrToString(const uint8_t* addr, int af);
 
 /**
  * The memeq() function compares the first n bytes (each interpreted as

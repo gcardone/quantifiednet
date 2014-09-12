@@ -9,6 +9,7 @@ class QNConnection {
 public:
   QNConnection(const uint8_t *addr_a, const uint8_t *addr_b, size_t addrlen, uint16_t port_a, uint16_t port_b);
   QNConnection(const QNConnection& o);
+  int address_family() const;
   size_t addrlen() const;
   const uint8_t* addr_a() const;
   const uint8_t* addr_b() const;

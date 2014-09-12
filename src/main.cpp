@@ -11,6 +11,9 @@
 #include "qnflow.h"
 #include "util.h"
 
+#include <arpa/inet.h>
+#include <netinet/in.h>
+
 const char *argp_program_version = QUANTIFIEDNET_FULL_VERSION;
 const char *argp_program_bug_address = "<ippatsuman+quantifiednet@gmail.com>";
 
@@ -116,5 +119,22 @@ int main(int argc, char *argv[]) {
     print_usage();
   }
   init_db(arguments.database);
+
+  uint8_t s[] = {127, 1, 2, 3};
+  uint8_t d[] = {149, 3, 176, 56};
+  struct timeval now;
+  QNConnection conn = QNConnection(s, d, 4, 1025, 80);
+  std::cout << conn << std::endl;
+  gettimeofday(&now, NULL);
+  QNFlow qflow = QNFlow(conn, now);
+  qflow.AddSentA(10);
+  std::cout << qflow.sent_a() << " " << qflow.sent_b() << std::endl;
+  qflow.AddSentB(20);
+  std::cout << qflow.sent_a() << " " << qflow.sent_b() << std::endl;
+  qflow.AddSent(s, 30);
+  std::cout << qflow.sent_a() << " " << qflow.sent_b() << std::endl;
+  s[0] = 10;
+  qflow.AddSent(s, 30);
+  std::cout << qflow.sent_a() << " " << qflow.sent_b() << std::endl;
   return 0;
 }
