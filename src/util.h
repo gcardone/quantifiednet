@@ -2,8 +2,11 @@
 #define _qn_util
 
 #include <string>
+#include <netinet/in.h>
 
-std::string AddrToString(const uint8_t* addr, int af);
+std::string AddrToString(in_addr_t addr);
+
+in_addr_t StringToAddr(std::string addr);
 
 /**
  * The memeq() function compares the first n bytes (each interpreted as

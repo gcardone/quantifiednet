@@ -12,7 +12,7 @@ public:
   uint64_t sent_b() const;
   void AddSentA(uint64_t size);
   void AddSentB(uint64_t size);
-  void AddSent(const uint8_t* addr, uint64_t size);
+  void AddSent(in_addr_t addr, uint64_t size);
   const QNConnection& connection();
 private:
   void UpdateEndTime(const struct timeval& end_time);

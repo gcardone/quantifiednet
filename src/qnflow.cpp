@@ -35,13 +35,13 @@ void QNFlow::AddSentB(uint64_t size) {
 }
 
 
-void QNFlow::AddSent(const uint8_t* addr, uint64_t size) {
-  if (memeq(connection_.addr_a(), addr, connection_.addrlen())) {
+void QNFlow::AddSent(in_addr_t addr, uint64_t size) {
+  if (connection_.addr_a() == addr) {
     AddSentA(size);
-  } else if (memeq(connection_.addr_b(), addr, connection_.addrlen())) {
+  } else if (connection_.addr_b() ==  addr) {
     AddSentB(size);
   } else {
-    std::string straddr = AddrToString(addr, connection_.address_family());
+    std::string straddr = AddrToString(addr);
     std::ostringstream oss;
     oss << connection_;
     std::string strconnection = oss.str();

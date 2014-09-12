@@ -10,19 +10,23 @@
 #include "util.h"
 
 
-std::string AddrToString(const uint8_t* addr, int af) {
-  char buff[INET6_ADDRSTRLEN];
-  if (af == AF_INET) {
-    if (inet_ntop(AF_INET, addr, buff, INET_ADDRSTRLEN) == NULL) {
-        throw std::exception();
-    }
-  } else if (af == AF_INET6) {
-    if (inet_ntop(AF_INET6, addr, buff, INET6_ADDRSTRLEN) == NULL) {
-        throw std::exception();
-    }
+std::string AddrToString(in_addr_t addr) {
+  char buff[INET_ADDRSTRLEN];
+  if (inet_ntop(AF_INET, &addr, buff, INET_ADDRSTRLEN) == NULL) {
+    throw std::exception();
   }
   return std::string(buff);
 }
+
+
+in_addr_t StringToAddr(std::string addr) {
+  struct in_addr result;
+  if (!inet_pton(AF_INET, addr.c_str(), &result)) {
+    throw std::exception();
+  }
+  return result.s_addr;
+}
+
 
 int memeq(const void* s1, const void* s2, size_t n) {
   if (s1 == s2)

@@ -120,10 +120,10 @@ int main(int argc, char *argv[]) {
   }
   init_db(arguments.database);
 
-  uint8_t s[] = {127, 1, 2, 3};
-  uint8_t d[] = {149, 3, 176, 56};
+  in_addr_t s = StringToAddr("127.1.2.3");
+  in_addr_t d = StringToAddr("90.110.220.55");
   struct timeval now;
-  QNConnection conn = QNConnection(s, d, 4, 1025, 80);
+  QNConnection conn = QNConnection(s, 1025, d, 80);
   std::cout << conn << std::endl;
   gettimeofday(&now, NULL);
   QNFlow qflow = QNFlow(conn, now);
@@ -133,7 +133,7 @@ int main(int argc, char *argv[]) {
   std::cout << qflow.sent_a() << " " << qflow.sent_b() << std::endl;
   qflow.AddSent(s, 30);
   std::cout << qflow.sent_a() << " " << qflow.sent_b() << std::endl;
-  s[0] = 10;
+  s += 1;
   qflow.AddSent(s, 30);
   std::cout << qflow.sent_a() << " " << qflow.sent_b() << std::endl;
   return 0;

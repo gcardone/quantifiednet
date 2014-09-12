@@ -5,14 +5,14 @@
 #include <cstddef>
 #include <iostream>
 
+#include <netinet/in.h>
+
 class QNConnection {
 public:
-  QNConnection(const uint8_t *addr_a, const uint8_t *addr_b, size_t addrlen, uint16_t port_a, uint16_t port_b);
+  QNConnection(in_addr_t addr_a,uint16_t port_a, in_addr_t addr_b, uint16_t port_b);
   QNConnection(const QNConnection& o);
-  int address_family() const;
-  size_t addrlen() const;
-  const uint8_t* addr_a() const;
-  const uint8_t* addr_b() const;
+  in_addr_t addr_a() const;
+  in_addr_t addr_b() const;
   uint16_t port_a() const;
   uint16_t port_b() const;
   QNConnection& operator=(const QNConnection& o);
@@ -22,14 +22,12 @@ public:
   bool operator>(const QNConnection& o);
   bool operator<=(const QNConnection& o);
   bool operator>=(const QNConnection& o);
-  virtual ~QNConnection();
   friend std::ostream& operator<<(std::ostream& os, const QNConnection& o);
 protected:
-  size_t addrlen_;
   uint16_t port_a_;
   uint16_t port_b_;
-  uint8_t *addr_a_;
-  uint8_t *addr_b_;
+  in_addr_t addr_a_;
+  in_addr_t addr_b_;
 };
 
 #endif
