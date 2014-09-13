@@ -1,7 +1,11 @@
 #include <string>
 #include <iostream>
+#include <set>
 
 #include <argp.h>
+#include <arpa/inet.h>
+#include <ifaddrs.h>
+#include <netinet/in.h>
 #include <sqlite3.h>
 #include <sys/time.h>
 
@@ -11,8 +15,6 @@
 #include "qnflow.h"
 #include "util.h"
 
-#include <arpa/inet.h>
-#include <netinet/in.h>
 
 const char *argp_program_version = QUANTIFIEDNET_FULL_VERSION;
 const char *argp_program_bug_address = "<ippatsuman+quantifiednet@gmail.com>";
@@ -108,6 +110,32 @@ static bool init_db(const std::string path) {
   return true;
 }
 
+static std::set<in_addr_t> GetLocalAddressesOrDie() {
+  struct ifaddrs *ifaddr, *ifa;
+  int family;
+  std::set<in_addr_t> result;
+  
+  if (getifaddrs(&ifaddr) == -1) {
+    critical_log("%s", "getifaddrs");
+  }
+
+  for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+    if (ifa->ifa_addr == NULL) {
+      continue;
+    }
+    
+    family = ifa->ifa_addr->sa_family;
+    if (family != AF_INET) {
+      continue;
+    }
+    in_addr_t s_addr = (reinterpret_cast<struct sockaddr_in*>(ifa->ifa_addr))->sin_addr.s_addr;
+    result.insert(s_addr);
+  }
+
+  freeifaddrs(ifaddr);
+  return result;
+}
+
 int main(int argc, char *argv[]) {
   struct arguments arguments;
   arguments.verbose = 0;
@@ -121,9 +149,9 @@ int main(int argc, char *argv[]) {
   init_db(arguments.database);
 
   in_addr_t s = StringToAddr("127.1.2.3");
-  in_addr_t d = StringToAddr("90.110.220.55");
+  in_addr_t d = StringToAddr("90.110.220.254");
   struct timeval now;
-  QNConnection conn = QNConnection(s, 1025, d, 80);
+  QNConnection conn = QNConnection(d, 80, s, 1025);
   std::cout << conn << std::endl;
   gettimeofday(&now, NULL);
   QNFlow qflow = QNFlow(conn, now);
@@ -136,5 +164,11 @@ int main(int argc, char *argv[]) {
   s += 1;
   qflow.AddSent(s, 30);
   std::cout << qflow.sent_a() << " " << qflow.sent_b() << std::endl;
+ 
+  info_log("%s", "Collecting local addresses");
+  std::set<in_addr_t> addrs = GetLocalAddressesOrDie();
+  for (auto addr : addrs) {
+      info_log("... %s", AddrToString(addr).c_str());
+  }
   return 0;
 }
