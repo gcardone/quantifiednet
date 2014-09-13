@@ -27,11 +27,13 @@ uint64_t QNFlow::sent_b() const {
 
 void QNFlow::AddSentA(uint64_t size) {
   sent_a_ += size;
+  UpdateEndTime();
 }
 
 
 void QNFlow::AddSentB(uint64_t size) {
   sent_b_ += size;
+  UpdateEndTime();
 }
 
 
