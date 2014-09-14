@@ -10,7 +10,6 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
 #find_package(Sqlite3 REQUIRED)
 #find_package(PCAP REQUIRED)
-find_package (Threads REQUIRED)
 
 configure_file (
     "${CMAKE_SOURCE_DIR}/src/config.h.in"
@@ -24,7 +23,6 @@ include_directories(${PCAP_INCLUDE_DIR})
 
 #set(CMAKE_REQUIRED_LIBRARIES ${SQLITE3_LIBRARIES} ${PCAP_LIBRARY})
 add_executable(quantifiednet ${SOURCES})
-target_link_libraries(quantifiednet ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(quantifiednet "-lsqlite3")
 target_link_libraries(quantifiednet "-lpcap")
 
