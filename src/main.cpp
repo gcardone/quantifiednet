@@ -1,3 +1,4 @@
+#include <cstring>
 #include <string>
 #include <iostream>
 #include <set>
@@ -6,6 +7,8 @@
 #include <arpa/inet.h>
 #include <ifaddrs.h>
 #include <netinet/in.h>
+#include <pcap.h>
+#include <signal.h>
 #include <sqlite3.h>
 #include <sys/time.h>
 
@@ -25,7 +28,6 @@ static char args_doc[] = "INTERFACE DB";
 static struct argp_option options[] = {
   {"INTERFACE",   0, 0,       OPTION_DOC, "Interface to listen on (e.g., eth0)",  1},
   {"DB",      0, 0,       OPTION_DOC, "Path to SQLite database",        1},
-  {"verbose",   'v', 0,       0,      "Produce verbose output",         2},
   {    0,   0, 0,       0,      0,                    0}
 };
 
@@ -42,9 +44,6 @@ static error_t parse_opt (int key, char *arg, struct argp_state *state)
 {
   struct arguments *arguments = static_cast<struct arguments*>(state->input);
   switch (key) {
-    case 'v':
-      arguments->verbose = 1;
-      break;
     case ARGP_KEY_ARG:
       if (state->arg_num > 2) {
         argp_usage(state);
@@ -110,10 +109,9 @@ static bool init_db(const std::string path) {
   return true;
 }
 
-static std::set<in_addr_t> GetLocalAddressesOrDie() {
+static void GetLocalAddressesAndIntfOrDie(std::set<in_addr_t>& addresses, std::set<std::string>& interfaces) {
   struct ifaddrs *ifaddr, *ifa;
   int family;
-  std::set<in_addr_t> result;
   
   if (getifaddrs(&ifaddr) == -1) {
     critical_log("%s", "getifaddrs");
@@ -129,15 +127,46 @@ static std::set<in_addr_t> GetLocalAddressesOrDie() {
       continue;
     }
     in_addr_t s_addr = (reinterpret_cast<struct sockaddr_in*>(ifa->ifa_addr))->sin_addr.s_addr;
-    result.insert(s_addr);
+    addresses.insert(s_addr);
+    interfaces.insert(ifa->ifa_name);
   }
 
   freeifaddrs(ifaddr);
-  return result;
 }
+
+
+static void CheckIntfOrDie(const std::string& ifa) {
+  char errbuf[PCAP_ERRBUF_SIZE];
+  pcap_t *pcap;
+  pcap = pcap_create(ifa.c_str(), errbuf);
+  if (pcap == NULL) {
+    critical_log("Unable to open interface %s for capture: %s", ifa.c_str(), errbuf);
+  }
+  if (pcap_activate(pcap) != 0) {
+    char *msg = pcap_geterr(pcap);
+    std::strncpy(errbuf, msg, PCAP_ERRBUF_SIZE - 1);
+    errbuf[PCAP_ERRBUF_SIZE - 1] = '\0';
+    pcap_close(pcap);
+    critical_log("Unable to open interface %s for capture: %s", ifa.c_str(), errbuf);
+  }
+  pcap_close(pcap);
+}
+
+// evil global goes here: sorry, I need it in the signal handler.
+static pcap_t *p;
+
+static void SigHandler(int sig) {
+  if (p != NULL) {
+    pcap_breakloop(p);
+  }
+}
+
 
 int main(int argc, char *argv[]) {
   struct arguments arguments;
+  std::set<in_addr_t> addresses;
+  std::set<std::string> interfaces;
+
   arguments.verbose = 0;
   argp_parse(&argp, argc, argv, 0, 0, &arguments);
   if (arguments.interface.empty()) {
@@ -146,29 +175,21 @@ int main(int argc, char *argv[]) {
   if (arguments.database.empty()) {
     print_usage();
   }
+
   init_db(arguments.database);
 
-  in_addr_t s = StringToAddr("127.1.2.3");
-  in_addr_t d = StringToAddr("90.110.220.254");
-  struct timeval now;
-  QNConnection conn = QNConnection(d, 80, s, 1025);
-  std::cout << conn << std::endl;
-  gettimeofday(&now, NULL);
-  QNFlow qflow = QNFlow(conn, now);
-  qflow.AddSentA(10);
-  std::cout << qflow.sent_a() << " " << qflow.sent_b() << std::endl;
-  qflow.AddSentB(20);
-  std::cout << qflow.sent_a() << " " << qflow.sent_b() << std::endl;
-  qflow.AddSent(s, 30);
-  std::cout << qflow.sent_a() << " " << qflow.sent_b() << std::endl;
-  s += 1;
-  qflow.AddSent(s, 30);
-  std::cout << qflow.sent_a() << " " << qflow.sent_b() << std::endl;
- 
-  info_log("%s", "Collecting local addresses");
-  std::set<in_addr_t> addrs = GetLocalAddressesOrDie();
-  for (auto addr : addrs) {
-      info_log("... %s", AddrToString(addr).c_str());
+  info_log("Collecting local addresses");
+  interfaces.insert("any");
+  GetLocalAddressesAndIntfOrDie(addresses, interfaces);
+  if (interfaces.find(arguments.interface) == interfaces.end()) {
+    critical_log("Interface %s is not a valid AF_INET interface", arguments.interface.c_str());
+  }
+
+  info_log("Checking capture interface %s", arguments.interface.c_str());
+  CheckIntfOrDie(arguments.interface);
+
+  if (signal(SIGINT, SigHandler) == SIG_ERR) {
+    critical_log("Error while installing signal handler");
   }
   return 0;
 }
