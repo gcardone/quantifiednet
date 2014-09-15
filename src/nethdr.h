@@ -25,8 +25,8 @@ struct ether_hdr {
   uint16_t ether_type; /* IP, ARP, RARP, etc. */
 };
 
-#define IP_VERSION(ip) ((ip)->vhl >> 4)
-#define IP_HL(ip)      ((ip)->vhl & 0x0f)
+#define IP_VERSION(ip) (((ip)->vhl) >> 4)
+#define IP_HL(ip)      (((ip)->vhl) & 0x0f)
 #define IP_RF 0x8000       /* reserved fragment flag */
 #define IP_DF 0x4000       /* dont fragment flag */
 #define IP_MF 0x2000       /* more fragments flag */
