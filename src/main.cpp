@@ -1,6 +1,7 @@
 #include <cstring>
 #include <string>
 #include <iostream>
+#include <map>
 #include <set>
 
 #include <argp.h>
@@ -32,12 +33,12 @@ static struct argp_option options[] = {
 };
 
 
-/* Used by main to communicate with parse_opt. */
 struct arguments
 {
-  int verbose;
   std::string database;
   std::string interface;
+  std::map<QNConnection, QNFlow> traffic;
+  int pcap_dl_type;
 };
 
 static error_t parse_opt (int key, char *arg, struct argp_state *state)
@@ -70,14 +71,14 @@ static void print_usage(void) {
   argp_help(&argp, stderr, ARGP_HELP_DOC, 0);
 }
 
-static bool init_db(const std::string path) {
+static bool InitDbOrDie(const std::string path) {
   std::string file_uri;
   std::string create_table =
     "create table if not exists tcp_connections (id integer primary key, " \
     "srcip text not null, srcport integer not null, dstip text not null, " \
     "dstport integer not null, sent integer not null, " \
-    "rcvd integer not null, starttime integer not null, " \
-    "endtime integer not null);";
+    "rcvd integer not null, starttime text not null, " \
+    "endtime text not null);";
   int rc;
   sqlite3 *pDB;
   sqlite3_stmt *pStmt;
@@ -135,9 +136,10 @@ static void GetLocalAddressesAndIntfOrDie(std::set<in_addr_t>& addresses, std::s
 }
 
 
-static void CheckIntfOrDie(const std::string& ifa) {
+static void CheckIntfOrDie(const std::string& ifa, struct arguments& arg) {
   char errbuf[PCAP_ERRBUF_SIZE];
   pcap_t *pcap;
+  int dl_type;
   pcap = pcap_create(ifa.c_str(), errbuf);
   if (pcap == NULL) {
     critical_log("Unable to open interface %s for capture: %s", ifa.c_str(), errbuf);
@@ -149,8 +151,16 @@ static void CheckIntfOrDie(const std::string& ifa) {
     pcap_close(pcap);
     critical_log("Unable to open interface %s for capture: %s", ifa.c_str(), errbuf);
   }
+  dl_type = pcap_datalink(pcap);
+  if (dl_type != DLT_LINUX_SLL && dl_type != DLT_EN10MB) {
+    pcap_close(pcap);
+    critical_log("Interface %s has datalink type %s (%s), which is not currently supported",
+      ifa.c_str(), pcap_datalink_val_to_name(dl_type), pcap_datalink_val_to_description(dl_type));
+  }
+  arg.pcap_dl_type = dl_type;
   pcap_close(pcap);
 }
+
 
 // evil global goes here: sorry, I need it in the signal handler.
 static pcap_t *p;
@@ -162,12 +172,15 @@ static void SigHandler(int sig) {
 }
 
 
+static void ProcessPkt(unsigned char *user, const struct pcap_pkthdr *h, const u_char *bytes) {
+}
+
+
 int main(int argc, char *argv[]) {
   struct arguments arguments;
   std::set<in_addr_t> addresses;
   std::set<std::string> interfaces;
 
-  arguments.verbose = 0;
   argp_parse(&argp, argc, argv, 0, 0, &arguments);
   if (arguments.interface.empty()) {
     print_usage();
@@ -176,7 +189,7 @@ int main(int argc, char *argv[]) {
     print_usage();
   }
 
-  init_db(arguments.database);
+  InitDbOrDie(arguments.database);
 
   info_log("Collecting local addresses");
   interfaces.insert("any");
@@ -185,9 +198,10 @@ int main(int argc, char *argv[]) {
     critical_log("Interface %s is not a valid AF_INET interface", arguments.interface.c_str());
   }
 
-  info_log("Checking capture interface %s", arguments.interface.c_str());
-  CheckIntfOrDie(arguments.interface);
+  info_log("Checking capture interface \"%s\"", arguments.interface.c_str());
+  CheckIntfOrDie(arguments.interface, arguments);
 
+  info_log("Control-C to quit");
   if (signal(SIGINT, SigHandler) == SIG_ERR) {
     critical_log("Error while installing signal handler");
   }
