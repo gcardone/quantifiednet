@@ -10,7 +10,7 @@
 /* This struct is needed when capturing from the "any" interface. See
  * http://www.tcpdump.org/linktypes/LINKTYPE_LINUX_SLL.html for more details
  */
-struct linux_sll {
+struct linux_sll_hdr {
   uint16_t packet_type;
   uint16_t arphrd_type;
   uint16_t addr_len;
