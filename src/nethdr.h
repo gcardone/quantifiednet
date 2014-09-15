@@ -46,7 +46,7 @@ struct ip_hdr {
 };
 
 
-#define TCP_DOFF(th) (((th)->off_rsvd_ns & 0xf0) >> 4)
+#define TCP_DOFF(th) ((th)->off_rsvd_ns >> 4)
 #define TCP_NS(th) ((th)->off_rsvd_ns & 0x01)
 #define TCP_FIN  0x01
 #define TCP_SYN  0x02
