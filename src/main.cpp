@@ -15,6 +15,7 @@
 
 #include "config.h"
 #include "log.h"
+#include "nethdr.h"
 #include "qnconnection.h"
 #include "qnflow.h"
 #include "util.h"
@@ -145,11 +146,7 @@ static void CheckIntfOrDie(const std::string& ifa, struct arguments& arg) {
     critical_log("Unable to open interface %s for capture: %s", ifa.c_str(), errbuf);
   }
   if (pcap_activate(pcap) != 0) {
-    char *msg = pcap_geterr(pcap);
-    std::strncpy(errbuf, msg, PCAP_ERRBUF_SIZE - 1);
-    errbuf[PCAP_ERRBUF_SIZE - 1] = '\0';
-    pcap_close(pcap);
-    critical_log("Unable to open interface %s for capture: %s", ifa.c_str(), errbuf);
+    critical_log("Unable to open interface %s for capture: %s", ifa.c_str(), pcap_geterr(pcap));
   }
   dl_type = pcap_datalink(pcap);
   if (dl_type != DLT_LINUX_SLL && dl_type != DLT_EN10MB) {
@@ -173,11 +170,29 @@ static void SigHandler(int sig) {
 
 
 static void ProcessPkt(unsigned char *user, const struct pcap_pkthdr *h, const u_char *bytes) {
+  struct arguments* arguments;
+  const struct linux_sll_hdr* linux_sll_hdr;
+  const struct ether_hdr* ether_hdr;
+  const struct ip_hdr* ip_hdr;
+  const struct tcp_hdr* tcp_hdr;
+
+  arguments = reinterpret_cast<struct arguments*>(user);
+  
+  if (arguments->pcap_dl_type == DLT_LINUX_SLL) {
+    ip_hdr = reinterpret_cast<const struct ip_hdr*>(bytes + sizeof(struct linux_sll_hdr));
+  } else {
+    // arguments->pcap_dl_type == DLT_EN10MB
+    ip_hdr = reinterpret_cast<const struct ip_hdr*>(bytes + sizeof(struct ether_hdr));
+  }
+  info_log("%s -> %s", AddrToString(ip_hdr->src).c_str(), AddrToString(ip_hdr->dest).c_str());
 }
 
 
 int main(int argc, char *argv[]) {
   struct arguments arguments;
+  char errbuf[PCAP_ERRBUF_SIZE];
+  char filter_expression[] = "ip";
+  struct bpf_program filter;
   std::set<in_addr_t> addresses;
   std::set<std::string> interfaces;
 
@@ -205,5 +220,23 @@ int main(int argc, char *argv[]) {
   if (signal(SIGINT, SigHandler) == SIG_ERR) {
     critical_log("Error while installing signal handler");
   }
+
+  p = pcap_create(arguments.interface.c_str(), errbuf);
+  if (p == NULL) {
+    critical_log("Unable to open interface %s for capture: %s", arguments.interface.c_str(), errbuf);
+  }
+  if (pcap_activate(p) != 0) {
+    critical_log("Unable to open interface %s for capture: %s", arguments.interface.c_str(), pcap_geterr(p));
+  }
+  arguments.pcap_dl_type = pcap_datalink(p);
+  if (pcap_compile(p, &filter, filter_expression, 0, PCAP_NETMASK_UNKNOWN) != 0) {
+    critical_log("Unable to compile filter expression: %s", pcap_geterr(p));
+  }
+  if (pcap_setfilter(p, &filter) != 0) {
+    critical_log("Unable to set filter: %s", pcap_geterr(p));
+  }
+  pcap_loop(p, 0, ProcessPkt, reinterpret_cast<u_char*>(&arguments));
+  pcap_freecode(&filter);
+  pcap_close(p);
   return 0;
 }
