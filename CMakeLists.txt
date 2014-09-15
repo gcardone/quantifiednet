@@ -8,7 +8,7 @@ set(QUANTIFIEDNET_VERSION_MINOR 1)
 file(GLOB SOURCES RELATIVE ${CMAKE_SOURCE_DIR} "src/*.cpp")
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
-#find_package(Sqlite3 REQUIRED)
+find_package(Sqlite3 REQUIRED)
 #find_package(PCAP REQUIRED)
 
 configure_file (
