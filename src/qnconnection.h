@@ -16,12 +16,12 @@ public:
   uint16_t port_a() const;
   uint16_t port_b() const;
   QNConnection& operator=(const QNConnection& o);
-  bool operator==(const QNConnection& o);
-  bool operator!=(const QNConnection& o);
-  bool operator<(const QNConnection& o);
-  bool operator>(const QNConnection& o);
-  bool operator<=(const QNConnection& o);
-  bool operator>=(const QNConnection& o);
+  friend bool operator==(const QNConnection& a, const QNConnection& b);
+  friend bool operator!=(const QNConnection& a, const QNConnection& b);
+  friend bool operator<(const QNConnection& a, const QNConnection& b);
+  friend bool operator>(const QNConnection& a, const QNConnection& b);
+  friend bool operator<=(const QNConnection& a, const QNConnection& b);
+  friend bool operator>=(const QNConnection& a, const QNConnection& b);
   friend std::ostream& operator<<(std::ostream& os, const QNConnection& o);
 protected:
   uint16_t port_a_;
