@@ -2,6 +2,7 @@
 #define qnflow_h_
 
 #include <cstdint>
+#include <iostream>
 #include <sys/time.h>
 #include "qnconnection.h"
 
@@ -14,6 +15,7 @@ public:
   void AddSentB(uint64_t size);
   void AddSent(in_addr_t addr, uint64_t size);
   const QNConnection& connection();
+  friend std::ostream& operator<<(std::ostream& os, const QNFlow& o);
 private:
   void UpdateEndTime(const struct timeval& end_time);
   void UpdateEndTime();

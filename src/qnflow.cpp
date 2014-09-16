@@ -66,3 +66,12 @@ void QNFlow::UpdateEndTime() {
     gettimeofday(&end_time_, NULL);
 }
 
+
+std::ostream& operator<<(std::ostream& os, const QNFlow& o) {
+  os << "[" << AddrToString(o.connection_.addr_a()) << "]:" << ntohs(o.connection_.port_a());
+  os << " (" << o.sent_a_ << " bytes) ";
+  os << "<-> ";
+  os << "[" << AddrToString(o.connection_.addr_b()) << "]:" << ntohs(o.connection_.port_b());
+  os << " (" << o.sent_b_ << " bytes)";
+  return os;
+}
