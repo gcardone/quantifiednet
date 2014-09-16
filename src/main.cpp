@@ -171,20 +171,43 @@ static void SigHandler(int sig) {
 
 static void ProcessPkt(unsigned char *user, const struct pcap_pkthdr *h, const u_char *bytes) {
   struct arguments* arguments;
-  const struct linux_sll_hdr* linux_sll_hdr;
-  const struct ether_hdr* ether_hdr;
   const struct ip_hdr* ip_hdr;
   const struct tcp_hdr* tcp_hdr;
+  size_t datalink_size;
+  size_t ip_size;
 
   arguments = reinterpret_cast<struct arguments*>(user);
   
   if (arguments->pcap_dl_type == DLT_LINUX_SLL) {
     ip_hdr = reinterpret_cast<const struct ip_hdr*>(bytes + sizeof(struct linux_sll_hdr));
+    datalink_size = sizeof(struct linux_sll_hdr);
   } else {
     // arguments->pcap_dl_type == DLT_EN10MB
-    ip_hdr = reinterpret_cast<const struct ip_hdr*>(bytes + sizeof(struct ether_hdr));
+    datalink_size = sizeof(struct ether_hdr);
   }
-  info_log("%s -> %s", AddrToString(ip_hdr->src).c_str(), AddrToString(ip_hdr->dest).c_str());
+  ip_hdr = reinterpret_cast<const struct ip_hdr*>(bytes + datalink_size);
+
+  // discard non TCP packets
+  if (ip_hdr->proto != IPPROTO_TCP)
+      return;
+
+  ip_size = IP_HL(ip_hdr)*sizeof(uint32_t);
+  tcp_hdr = reinterpret_cast<const struct tcp_hdr*>(bytes + datalink_size + ip_size);
+  QNConnection conn = QNConnection(ip_hdr->src, tcp_hdr->sport, ip_hdr->dest, tcp_hdr->dport);
+  auto pflow = arguments->traffic.find(conn);
+  if ((tcp_hdr->flags & TCP_SYN) && (tcp_hdr->flags & TCP_ACK)) {
+    // new connection
+    struct timeval now;
+    gettimeofday(&now, NULL);
+    QNFlow flow = QNFlow(conn, now);
+    info_log("New connection %s:%u -> %s:%u", AddrToString(ip_hdr->src).c_str(), ntohs(tcp_hdr->sport), AddrToString(ip_hdr->dest).c_str(), ntohs(tcp_hdr->dport));
+    arguments->traffic.insert(std::make_pair(conn, flow));
+  } else if (pflow != arguments->traffic.end() && ((tcp_hdr->flags & TCP_FIN) | (tcp_hdr->flags & TCP_RST))) {
+    arguments->traffic.erase(pflow);
+    info_log("Closed connection %s:%u -> %s:%u", AddrToString(ip_hdr->src).c_str(), ntohs(tcp_hdr->sport), AddrToString(ip_hdr->dest).c_str(), ntohs(tcp_hdr->dport));
+  } else if (pflow != arguments->traffic.end()) {
+    
+  }
 }
 
 
