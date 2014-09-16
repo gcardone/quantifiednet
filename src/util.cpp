@@ -6,6 +6,7 @@
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <time.h>
 
 #include "util.h"
 
@@ -19,7 +20,7 @@ std::string AddrToString(in_addr_t addr) {
 }
 
 
-in_addr_t StringToAddr(std::string addr) {
+in_addr_t StringToAddr(const std::string& addr) {
   struct in_addr result;
   if (!inet_pton(AF_INET, addr.c_str(), &result)) {
     throw std::exception();
@@ -27,6 +28,17 @@ in_addr_t StringToAddr(std::string addr) {
   return result.s_addr;
 }
 
+
+std::string TimevalToString(const struct timeval& tv) {
+  time_t time;
+  struct tm* tm;
+  char tmpbuf[64], buf[64];
+  time = tv.tv_sec;
+  tm = localtime(&time);
+  strftime(tmpbuf, sizeof(tmpbuf), "%Y-%m-%d %H:%M:%S", tm);
+  snprintf(buf, sizeof(buf), "%s.%03lu", tmpbuf, tv.tv_usec/1000);
+  return std::string(buf);
+}
 
 int memeq(const void* s1, const void* s2, size_t n) {
   if (s1 == s2)

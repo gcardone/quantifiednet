@@ -2,11 +2,15 @@
 #define _qn_util
 
 #include <string>
+
 #include <netinet/in.h>
+#include <sys/time.h>
 
 std::string AddrToString(in_addr_t addr);
 
-in_addr_t StringToAddr(std::string addr);
+in_addr_t StringToAddr(const std::string& addr);
+
+std::string TimevalToString(const struct timeval& tv);
 
 /**
  * The memeq() function compares the first n bytes (each interpreted as

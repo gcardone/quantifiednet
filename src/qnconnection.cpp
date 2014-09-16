@@ -21,14 +21,6 @@ QNConnection::QNConnection(in_addr_t addr_a, uint16_t port_a, in_addr_t addr_b, 
 }
 
 
-QNConnection::QNConnection(const QNConnection& o) :
-    port_a_(o.port_a_),
-    port_b_(o.port_b_),
-    addr_a_(o.addr_a_),
-    addr_b_(o.addr_b_) {
-}
-
-
 in_addr_t QNConnection::addr_a() const {
   return addr_a_;
 }

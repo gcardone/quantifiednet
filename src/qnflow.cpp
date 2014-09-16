@@ -73,5 +73,6 @@ std::ostream& operator<<(std::ostream& os, const QNFlow& o) {
   os << "<-> ";
   os << "[" << AddrToString(o.connection_.addr_b()) << "]:" << ntohs(o.connection_.port_b());
   os << " (" << o.sent_b_ << " bytes)";
+  os << " start: " << TimevalToString(o.start_time_) << " - end: " << TimevalToString(o.end_time_);
   return os;
 }

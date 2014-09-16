@@ -10,7 +10,6 @@
 class QNConnection {
 public:
   QNConnection(in_addr_t addr_a,uint16_t port_a, in_addr_t addr_b, uint16_t port_b);
-  QNConnection(const QNConnection& o);
   in_addr_t addr_a() const;
   in_addr_t addr_b() const;
   uint16_t port_a() const;
