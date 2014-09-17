@@ -37,11 +37,14 @@ static struct argp_option options[] = {
 
 struct arguments
 {
-  int verbose;
+  std::set<in_addr_t> local_ips;
   std::string database;
   std::string interface;
-  std::map<QNConnection, QNFlow> traffic;
+  sqlite3* pDB;
   int pcap_dl_type;
+  sqlite3_stmt* pStmt;
+  std::map<QNConnection, QNFlow> traffic;
+  int verbose;
 };
 
 static error_t parse_opt (int key, char *arg, struct argp_state *state)
@@ -77,18 +80,21 @@ static void print_usage(void) {
   argp_help(&argp, stderr, ARGP_HELP_DOC, 0);
 }
 
-static bool InitDbOrDie(const std::string path) {
+static bool InitDbOrDie(struct arguments& arguments) {
   std::string file_uri;
   std::string create_table =
     "create table if not exists tcp_connections (id integer primary key, " \
-    "srcip text not null, srcport integer not null, dstip text not null, " \
-    "dstport integer not null, sent integer not null, " \
+    "locip text not null, locport integer not null, remip text not null, " \
+    "remport integer not null, sent integer not null, " \
     "rcvd integer not null, starttime text not null, " \
     "endtime text not null);";
+  std::string insert_query = 
+    "insert into tcp_connections(locip, locport, remip, remport, sent, " \
+    "rcvd, starttime, endtime) values (?, ?, ?, ?, ?, ?, ?, ?);";
   int rc;
   sqlite3 *pDB;
   sqlite3_stmt *pStmt;
-  file_uri = "file:" + path;
+  file_uri = "file:" + arguments.database;
   info_log("Using %s as Sqlite3 db", file_uri.c_str());
   sqlite3_config(SQLITE_CONFIG_URI, 1);
   rc = sqlite3_open_v2(file_uri.c_str(), &pDB, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_URI, NULL);
@@ -112,7 +118,14 @@ static bool InitDbOrDie(const std::string path) {
   }
 
   sqlite3_finalize(pStmt);
-  sqlite3_close(pDB);
+  rc = sqlite3_prepare_v2(pDB, insert_query.c_str(), insert_query.length(), &(arguments.pStmt), NULL);
+  if (rc != SQLITE_OK) {
+    sqlite3_finalize(arguments.pStmt);
+    sqlite3_close(pDB);
+    critical_log("%s", sqlite3_errstr(rc));
+  }
+  arguments.pDB = pDB;
+  arguments.database = file_uri;
   return true;
 }
 
@@ -174,6 +187,52 @@ static void SigHandler(int sig) {
 }
 
 
+static void StoreFlowInDB(const arguments& args, const QNFlow& flow) {
+  const QNConnection& conn = flow.connection();
+  sqlite3_stmt* pStmt = args.pStmt;
+  std::string srcip;
+  std::string dstip;
+  uint16_t srcport;
+  uint16_t dstport;
+  uint64_t sent;
+  uint64_t rcvd;
+  std::string starttime;
+  std::string endtime;
+  int rc;
+
+  if (args.local_ips.find(conn.addr_a()) != args.local_ips.end()) {
+    srcip = AddrToString(conn.addr_a());
+    srcport = ntohs(conn.port_a());
+    dstip = AddrToString(conn.addr_b());
+    dstport = ntohs(conn.port_b());
+    sent = flow.sent_a();
+    rcvd = flow.sent_b();
+  } else {
+    srcip = AddrToString(conn.addr_b());
+    srcport = ntohs(conn.port_b());
+    dstip = AddrToString(conn.addr_a());
+    dstport = ntohs(conn.port_a());
+    sent = flow.sent_b();
+    rcvd = flow.sent_a();
+  }
+  starttime = TimevalToString(flow.start_time());
+  endtime = TimevalToString(flow.end_time());
+  sqlite3_bind_text(pStmt, 1, srcip.c_str(), srcip.length(), SQLITE_STATIC);
+  sqlite3_bind_int(pStmt, 2, srcport);
+  sqlite3_bind_text(pStmt, 3, dstip.c_str(), dstip.length(), SQLITE_STATIC);
+  sqlite3_bind_int(pStmt, 4, dstport);
+  sqlite3_bind_int64(pStmt, 5, sent);
+  sqlite3_bind_int64(pStmt, 6, rcvd);
+  sqlite3_bind_text(pStmt, 7, starttime.c_str(), starttime.length(), SQLITE_STATIC);
+  sqlite3_bind_text(pStmt, 8, endtime.c_str(), endtime.length(), SQLITE_STATIC);
+  rc = sqlite3_step(pStmt);
+  if (rc != SQLITE_DONE) {
+    err_log("%s", sqlite3_errstr(rc));
+  }
+  sqlite3_reset(pStmt);
+}
+
+
 static void ProcessPkt(unsigned char *user, const struct pcap_pkthdr *h, const u_char *bytes) {
   struct arguments* arguments;
   const struct ip_hdr* ip_hdr;
@@ -205,14 +264,18 @@ static void ProcessPkt(unsigned char *user, const struct pcap_pkthdr *h, const u
     struct timeval now;
     gettimeofday(&now, NULL);
     QNFlow flow = QNFlow(conn, now);
-    info_log("New connection %s:%u -> %s:%u", AddrToString(ip_hdr->src).c_str(), ntohs(tcp_hdr->sport), AddrToString(ip_hdr->dest).c_str(), ntohs(tcp_hdr->dport));
+    if (arguments->verbose) {
+      info_log("New connection %s:%u -> %s:%u", AddrToString(ip_hdr->src).c_str(), ntohs(tcp_hdr->sport), AddrToString(ip_hdr->dest).c_str(), ntohs(tcp_hdr->dport));
+    }
     arguments->traffic.insert(std::make_pair(conn, flow));
   } else if (pflow != arguments->traffic.end()) {
       // untracked connection
       if ((tcp_hdr->flags & TCP_FIN) || (tcp_hdr->flags & TCP_RST)) {
+        StoreFlowInDB(*arguments, pflow->second);
+        if (arguments->verbose) {
+          info_log("Closed connection %s:%u -> %s:%u", AddrToString(ip_hdr->src).c_str(), ntohs(tcp_hdr->sport), AddrToString(ip_hdr->dest).c_str(), ntohs(tcp_hdr->dport));
+        }
         arguments->traffic.erase(pflow);
-        info_log("Closed connection %s:%u -> %s:%u", AddrToString(ip_hdr->src).c_str(), ntohs(tcp_hdr->sport), AddrToString(ip_hdr->dest).c_str(), ntohs(tcp_hdr->dport));
-        std::cout << (pflow->second) << std::endl;
       } else {
         uint32_t len = ntohs(ip_hdr->len) - IP_HL(ip_hdr)*sizeof(uint32_t) - TCP_DOFF(tcp_hdr)*sizeof(uint32_t);
         pflow->second.AddSent(ip_hdr->src, len);
@@ -224,12 +287,13 @@ static void ProcessPkt(unsigned char *user, const struct pcap_pkthdr *h, const u
 int main(int argc, char *argv[]) {
   struct arguments arguments;
   char errbuf[PCAP_ERRBUF_SIZE];
-  char filter_expression[] = "ip";
+  char filter_expression[] = "tcp";
   struct bpf_program filter;
-  std::set<in_addr_t> addresses;
   std::set<std::string> interfaces;
 
   arguments.verbose = 0;
+  arguments.pDB = NULL;
+  arguments.pStmt = NULL;
   argp_parse(&argp, argc, argv, 0, 0, &arguments);
   if (arguments.interface.empty()) {
     print_usage();
@@ -238,11 +302,11 @@ int main(int argc, char *argv[]) {
     print_usage();
   }
 
-  InitDbOrDie(arguments.database);
+  InitDbOrDie(arguments);
 
   info_log("Collecting local addresses");
   interfaces.insert("any");
-  GetLocalAddressesAndIntfOrDie(addresses, interfaces);
+  GetLocalAddressesAndIntfOrDie(arguments.local_ips, interfaces);
   if (interfaces.find(arguments.interface) == interfaces.end()) {
     critical_log("Interface %s is not a valid AF_INET interface", arguments.interface.c_str());
   }
@@ -281,5 +345,7 @@ int main(int argc, char *argv[]) {
   pcap_loop(p, 0, ProcessPkt, reinterpret_cast<u_char*>(&arguments));
   pcap_freecode(&filter);
   pcap_close(p);
+  sqlite3_finalize(arguments.pStmt);
+  sqlite3_close(arguments.pDB);
   return 0;
 }
