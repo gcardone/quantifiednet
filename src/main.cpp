@@ -248,6 +248,15 @@ int main(int argc, char *argv[]) {
   if (signal(SIGINT, SigHandler) == SIG_ERR) {
     critical_log("Error while installing signal handler");
   }
+  if (signal(SIGHUP, SigHandler) == SIG_ERR) {
+    critical_log("Error while installing signal handler");
+  }
+  if (signal(SIGQUIT, SigHandler) == SIG_ERR) {
+    critical_log("Error while installing signal handler");
+  }
+  if (signal(SIGTERM, SigHandler) == SIG_ERR) {
+    critical_log("Error while installing signal handler");
+  }
 
   p = pcap_create(arguments.interface.c_str(), errbuf);
   if (p == NULL) {
