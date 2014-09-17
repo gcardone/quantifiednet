@@ -15,6 +15,11 @@ QNFlow::QNFlow(const QNConnection& qnconnection, const struct timeval& start_tim
 }
 
 
+const struct timeval& QNFlow::start_time() const {
+  return start_time_;
+}
+
+
 uint64_t QNFlow::sent_a() const {
   return sent_a_;
 }
@@ -22,6 +27,11 @@ uint64_t QNFlow::sent_a() const {
 
 uint64_t QNFlow::sent_b() const {
   return sent_b_;
+}
+
+
+const struct timeval& QNFlow::end_time() const {
+  return end_time_;
 }
 
 
@@ -53,7 +63,7 @@ void QNFlow::AddSent(in_addr_t addr, uint64_t size) {
 }
 
 
-const QNConnection& QNFlow::connection() {
+const QNConnection& QNFlow::connection() const {
     return connection_;
 }
 

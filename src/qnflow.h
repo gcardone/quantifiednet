@@ -9,12 +9,14 @@
 class QNFlow {
 public:
   QNFlow(const QNConnection& qnconnection, const struct timeval& start_time);
+  const struct timeval& end_time() const;
   uint64_t sent_a() const;
   uint64_t sent_b() const;
+  const struct timeval& start_time() const;
   void AddSentA(uint64_t size);
   void AddSentB(uint64_t size);
   void AddSent(in_addr_t addr, uint64_t size);
-  const QNConnection& connection();
+  const QNConnection& connection() const;
   friend std::ostream& operator<<(std::ostream& os, const QNFlow& o);
 private:
   void UpdateEndTime(const struct timeval& end_time);
