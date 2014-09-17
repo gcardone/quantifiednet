@@ -229,6 +229,7 @@ int main(int argc, char *argv[]) {
   std::set<in_addr_t> addresses;
   std::set<std::string> interfaces;
 
+  arguments.verbose = 0;
   argp_parse(&argp, argc, argv, 0, 0, &arguments);
   if (arguments.interface.empty()) {
     print_usage();
