@@ -28,14 +28,16 @@ static char doc[] = "quantifiednet -- a minimal tracer of network connections";
 static char args_doc[] = "INTERFACE DB";
 
 static struct argp_option options[] = {
-  {"INTERFACE",   0, 0,       OPTION_DOC, "Interface to listen on (e.g., eth0)",  1},
-  {"DB",      0, 0,       OPTION_DOC, "Path to SQLite database",        1},
-  {    0,   0, 0,       0,      0,                    0}
+  {"INTERFACE",   0, 0,       OPTION_DOC, "Interface to listen on (e.g., eth0, any to listen on all available interfaces)",  1},
+  {"DB",          0, 0,       OPTION_DOC, "Path to SQLite database",              1},
+  {"verbose",   'v', 0,       0,          "Produce verbose output",               2},
+  {0,             0, 0,       0,          0,                                      0}
 };
 
 
 struct arguments
 {
+  int verbose;
   std::string database;
   std::string interface;
   std::map<QNConnection, QNFlow> traffic;
@@ -46,6 +48,9 @@ static error_t parse_opt (int key, char *arg, struct argp_state *state)
 {
   struct arguments *arguments = static_cast<struct arguments*>(state->input);
   switch (key) {
+    case 'v':
+      arguments->verbose = 1;
+      break;
     case ARGP_KEY_ARG:
       if (state->arg_num > 2) {
         argp_usage(state);
