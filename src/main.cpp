@@ -87,10 +87,10 @@ static bool InitDbOrDie(struct arguments& arguments) {
     "locip text not null, locport integer not null, remip text not null, " \
     "remport integer not null, sent integer not null, " \
     "rcvd integer not null, starttime text not null, " \
-    "endtime text not null);";
+    "endtime text not null, durationmsec integer not null);";
   std::string insert_query = 
     "insert into tcp_connections(locip, locport, remip, remport, sent, " \
-    "rcvd, starttime, endtime) values (?, ?, ?, ?, ?, ?, ?, ?);";
+    "rcvd, starttime, endtime, durationmsec) values (?, ?, ?, ?, ?, ?, ?, ?, ?);";
   int rc;
   sqlite3 *pDB;
   sqlite3_stmt *pStmt;
@@ -198,6 +198,7 @@ static void StoreFlowInDB(const arguments& args, const QNFlow& flow) {
   uint64_t rcvd;
   std::string starttime;
   std::string endtime;
+  uint64_t durationmsec;
   int rc;
 
   if (args.local_ips.find(conn.addr_a()) != args.local_ips.end()) {
@@ -225,6 +226,8 @@ static void StoreFlowInDB(const arguments& args, const QNFlow& flow) {
   sqlite3_bind_int64(pStmt, 6, rcvd);
   sqlite3_bind_text(pStmt, 7, starttime.c_str(), starttime.length(), SQLITE_STATIC);
   sqlite3_bind_text(pStmt, 8, endtime.c_str(), endtime.length(), SQLITE_STATIC);
+  durationmsec = (1000 * (flow.start_time().tv_sec -  flow.end_time().tv_sec) + flow.start_time().tv_usec / 1000) - flow.end_time().tv_usec / 1000;
+  sqlite3_bind_int64(pStmt, 9, durationmsec);
   rc = sqlite3_step(pStmt);
   if (rc != SQLITE_DONE) {
     err_log("%s", sqlite3_errstr(rc));
