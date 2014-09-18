@@ -226,7 +226,7 @@ static void StoreFlowInDB(const arguments& args, const QNFlow& flow) {
   sqlite3_bind_int64(pStmt, 6, rcvd);
   sqlite3_bind_text(pStmt, 7, starttime.c_str(), starttime.length(), SQLITE_STATIC);
   sqlite3_bind_text(pStmt, 8, endtime.c_str(), endtime.length(), SQLITE_STATIC);
-  durationmsec = (1000 * (flow.start_time().tv_sec -  flow.end_time().tv_sec) + flow.start_time().tv_usec / 1000) - flow.end_time().tv_usec / 1000;
+  durationmsec = (1000 * (flow.end_time().tv_sec -  flow.start_time().tv_sec) + flow.end_time().tv_usec / 1000) - flow.start_time().tv_usec / 1000;
   sqlite3_bind_int64(pStmt, 9, durationmsec);
   rc = sqlite3_step(pStmt);
   if (rc != SQLITE_DONE) {
