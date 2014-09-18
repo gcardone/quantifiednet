@@ -27,6 +27,6 @@ target_link_libraries(quantifiednet "-lsqlite3")
 target_link_libraries(quantifiednet "-lpcap")
 
 set_target_properties(quantifiednet PROPERTIES
-	COMPILE_FLAGS "-Wall -pedantic -g -std=c++11"
+	COMPILE_FLAGS "-O2 -Wall -pedantic -g -std=c++11"
 )
 
