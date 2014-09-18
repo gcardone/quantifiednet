@@ -272,17 +272,17 @@ static void ProcessPkt(unsigned char *user, const struct pcap_pkthdr *h, const u
     }
     arguments->traffic.insert(std::make_pair(conn, flow));
   } else if (pflow != arguments->traffic.end()) {
-      // untracked connection
-      if ((tcp_hdr->flags & TCP_FIN) || (tcp_hdr->flags & TCP_RST)) {
-        StoreFlowInDB(*arguments, pflow->second);
-        if (arguments->verbose) {
-          info_log("Closed connection %s:%u -> %s:%u", AddrToString(ip_hdr->src).c_str(), ntohs(tcp_hdr->sport), AddrToString(ip_hdr->dest).c_str(), ntohs(tcp_hdr->dport));
-        }
-        arguments->traffic.erase(pflow);
-      } else {
-        uint32_t len = ntohs(ip_hdr->len) - IP_HL(ip_hdr)*sizeof(uint32_t) - TCP_DOFF(tcp_hdr)*sizeof(uint32_t);
-        pflow->second.AddSent(ip_hdr->src, len);
+    // untracked connection
+    if ((tcp_hdr->flags & TCP_FIN) || (tcp_hdr->flags & TCP_RST)) {
+      StoreFlowInDB(*arguments, pflow->second);
+      if (arguments->verbose) {
+        info_log("Closed connection %s:%u -> %s:%u", AddrToString(ip_hdr->src).c_str(), ntohs(tcp_hdr->sport), AddrToString(ip_hdr->dest).c_str(), ntohs(tcp_hdr->dport));
       }
+      arguments->traffic.erase(pflow);
+    } else {
+      uint32_t len = ntohs(ip_hdr->len) - IP_HL(ip_hdr)*sizeof(uint32_t) - TCP_DOFF(tcp_hdr)*sizeof(uint32_t);
+      pflow->second.AddSent(ip_hdr->src, len);
+    }
   }
 }
 
