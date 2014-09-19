@@ -1,7 +1,6 @@
 #include <sstream>
 #include <string>
 #include <arpa/inet.h>
-#include "log.h"
 #include "qnflow.h"
 #include "util.h"
 
@@ -53,12 +52,8 @@ void QNFlow::AddSent(in_addr_t addr, uint64_t size) {
   } else if (connection_.addr_b() ==  addr) {
     AddSentB(size);
   } else {
-    std::string straddr = AddrToString(addr);
-    std::ostringstream oss;
-    oss << connection_;
-    std::string strconnection = oss.str();
-    err_log("Unable to add %lu bytes to connection %s for address %s", size,
-      strconnection.c_str(), straddr.c_str());
+    std::cout << "Unable to add " << size << " bytes to connection " <<\
+        connection_ << " for address " << AddrToString(addr) << std::endl;
   }
 }
 

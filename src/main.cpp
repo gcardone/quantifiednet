@@ -13,15 +13,13 @@
 #include <sqlite3.h>
 #include <sys/time.h>
 
-#include "config.h"
-#include "log.h"
 #include "nethdr.h"
 #include "qnconnection.h"
 #include "qnflow.h"
 #include "util.h"
 
 
-const char *argp_program_version = QUANTIFIEDNET_FULL_VERSION;
+const char *argp_program_version = "0.1";
 const char *argp_program_bug_address = "<ippatsuman+quantifiednet@gmail.com>";
 
 static char doc[] = "quantifiednet -- a minimal tracer of network connections";
@@ -95,26 +93,29 @@ static bool InitDbOrDie(struct arguments& arguments) {
   sqlite3 *pDB;
   sqlite3_stmt *pStmt;
   file_uri = "file:" + arguments.database;
-  info_log("Using %s as Sqlite3 db", file_uri.c_str());
+  std::cout << "Using " << file_uri << " as Sqlite3 db" << std::endl;
   sqlite3_config(SQLITE_CONFIG_URI, 1);
   rc = sqlite3_open_v2(file_uri.c_str(), &pDB, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_URI, NULL);
   if (rc != SQLITE_OK) {
     sqlite3_close(pDB);
-    critical_log("%s", sqlite3_errstr(rc));
+    std::cout << "Error: " << sqlite3_errstr(rc) << std::endl;
+    exit(EXIT_FAILURE);
   }
 
   rc = sqlite3_prepare_v2(pDB, create_table.c_str(), create_table.length(), &pStmt, NULL);
   if (rc != SQLITE_OK) {
     sqlite3_finalize(pStmt);
     sqlite3_close(pDB);
-    critical_log("%s", sqlite3_errstr(rc));
+    std::cout << "Error: " << sqlite3_errstr(rc) << std::endl;
+    exit(EXIT_FAILURE);
   }
 
   rc = sqlite3_step(pStmt);
   if (rc != SQLITE_DONE) {
     sqlite3_finalize(pStmt);
     sqlite3_close(pDB);
-    critical_log("%s", sqlite3_errstr(rc));
+    std::cout << "Error: " << sqlite3_errstr(rc) << std::endl;
+    exit(EXIT_FAILURE);
   }
 
   sqlite3_finalize(pStmt);
@@ -122,7 +123,8 @@ static bool InitDbOrDie(struct arguments& arguments) {
   if (rc != SQLITE_OK) {
     sqlite3_finalize(arguments.pStmt);
     sqlite3_close(pDB);
-    critical_log("%s", sqlite3_errstr(rc));
+    std::cout << "Error: " << sqlite3_errstr(rc) << std::endl;
+    exit(EXIT_FAILURE);
   }
   arguments.pDB = pDB;
   arguments.database = file_uri;
@@ -134,7 +136,8 @@ static void GetLocalAddressesAndIntfOrDie(std::set<in_addr_t>& addresses, std::s
   int family;
   
   if (getifaddrs(&ifaddr) == -1) {
-    critical_log("%s", "getifaddrs");
+    std::cout << "Error: getifaddrs" << std::endl;
+    exit(EXIT_FAILURE);
   }
 
   for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
@@ -161,16 +164,21 @@ static void CheckIntfOrDie(const std::string& ifa, struct arguments& arg) {
   int dl_type;
   pcap = pcap_create(ifa.c_str(), errbuf);
   if (pcap == NULL) {
-    critical_log("Unable to open interface %s for capture: %s", ifa.c_str(), errbuf);
+    std::cout << "Unable to open interface " << ifa << " for capture: " << errbuf << std::endl;
+    exit(EXIT_FAILURE);
   }
   if (pcap_activate(pcap) != 0) {
-    critical_log("Unable to open interface %s for capture: %s", ifa.c_str(), pcap_geterr(pcap));
+    std::cout << "Unable to open interface " << ifa << " for capture: " << pcap_geterr(pcap) << std::endl;
+    exit(EXIT_FAILURE);
   }
   dl_type = pcap_datalink(pcap);
   if (dl_type != DLT_LINUX_SLL && dl_type != DLT_EN10MB) {
     pcap_close(pcap);
-    critical_log("Interface %s has datalink type %s (%s), which is not currently supported",
-      ifa.c_str(), pcap_datalink_val_to_name(dl_type), pcap_datalink_val_to_description(dl_type));
+    std::cout << "Interface " << ifa << " has datalink type " << \
+        pcap_datalink_val_to_name(dl_type) << " (" << \
+        pcap_datalink_val_to_description(dl_type) << "), which is not " \
+        "currently supported";
+    exit(EXIT_FAILURE);
   }
   arg.pcap_dl_type = dl_type;
   pcap_close(pcap);
@@ -230,26 +238,27 @@ static void StoreFlowInDB(const arguments& args, const QNFlow& flow) {
   sqlite3_bind_int64(pStmt, 9, durationmsec);
   rc = sqlite3_step(pStmt);
   if (rc != SQLITE_DONE) {
-    err_log("%s", sqlite3_errstr(rc));
+    std::cout << "Error: " << sqlite3_errstr(rc) << std::endl;
   }
   sqlite3_reset(pStmt);
 }
 
 
 static void ProcessPkt(unsigned char *user, const struct pcap_pkthdr *h, const u_char *bytes) {
-  struct arguments* arguments;
+  struct arguments* args;
   const struct ip_hdr* ip_hdr;
   const struct tcp_hdr* tcp_hdr;
   size_t datalink_size;
   size_t ip_size;
+  struct timeval now;
 
-  arguments = reinterpret_cast<struct arguments*>(user);
+  args = reinterpret_cast<struct arguments*>(user);
   
-  if (arguments->pcap_dl_type == DLT_LINUX_SLL) {
+  if (args->pcap_dl_type == DLT_LINUX_SLL) {
     ip_hdr = reinterpret_cast<const struct ip_hdr*>(bytes + sizeof(struct linux_sll_hdr));
     datalink_size = sizeof(struct linux_sll_hdr);
   } else {
-    // arguments->pcap_dl_type == DLT_EN10MB
+    // args->pcap_dl_type == DLT_EN10MB
     datalink_size = sizeof(struct ether_hdr);
   }
   ip_hdr = reinterpret_cast<const struct ip_hdr*>(bytes + datalink_size);
@@ -261,94 +270,123 @@ static void ProcessPkt(unsigned char *user, const struct pcap_pkthdr *h, const u
   ip_size = IP_HL(ip_hdr)*sizeof(uint32_t);
   tcp_hdr = reinterpret_cast<const struct tcp_hdr*>(bytes + datalink_size + ip_size);
   QNConnection conn = QNConnection(ip_hdr->src, tcp_hdr->sport, ip_hdr->dest, tcp_hdr->dport);
-  auto pflow = arguments->traffic.find(conn);
+  auto pflow = args->traffic.find(conn);
   if ((tcp_hdr->flags & TCP_SYN) && (tcp_hdr->flags & TCP_ACK)) {
     // new connection
     struct timeval now;
     gettimeofday(&now, NULL);
     QNFlow flow = QNFlow(conn, now);
-    if (arguments->verbose) {
-      info_log("New connection %s:%u -> %s:%u", AddrToString(ip_hdr->src).c_str(), ntohs(tcp_hdr->sport), AddrToString(ip_hdr->dest).c_str(), ntohs(tcp_hdr->dport));
+    if (args->verbose) {
+      std::cout << "New connection: " << conn << std::endl;
     }
-    arguments->traffic.insert(std::make_pair(conn, flow));
-  } else if (pflow != arguments->traffic.end()) {
-    // untracked connection
+    args->traffic.insert(std::make_pair(conn, flow));
+  } else if (pflow != args->traffic.end()) {
+    // tracked connection
     if ((tcp_hdr->flags & TCP_FIN) || (tcp_hdr->flags & TCP_RST)) {
-      StoreFlowInDB(*arguments, pflow->second);
-      if (arguments->verbose) {
-        info_log("Closed connection %s:%u -> %s:%u", AddrToString(ip_hdr->src).c_str(), ntohs(tcp_hdr->sport), AddrToString(ip_hdr->dest).c_str(), ntohs(tcp_hdr->dport));
+      // closed connection
+      StoreFlowInDB(*args, pflow->second);
+      if (args->verbose) {
+        std::cout << "Closed connection: " << conn << std::endl;
       }
-      arguments->traffic.erase(pflow);
+      args->traffic.erase(pflow);
     } else {
+      // increase traffic size
       uint32_t len = ntohs(ip_hdr->len) - IP_HL(ip_hdr)*sizeof(uint32_t) - TCP_DOFF(tcp_hdr)*sizeof(uint32_t);
       pflow->second.AddSent(ip_hdr->src, len);
+    }
+  }
+
+  // purge connections more than 120 seconds old without updates (default
+  // timeout on Linux 2.2+ is 60 seconds)
+  gettimeofday(&now, NULL);
+  for (auto it = args->traffic.cbegin(); it != args->traffic.cend();) {
+    if ((now.tv_sec - it->second.end_time().tv_sec) > 120) {
+      StoreFlowInDB(*args, it->second);
+      if (args->verbose) {
+        std::cout << "Connection timed out: " << it->first;
+      }
+      args->traffic.erase(it++);
+    } else {
+      it++;
     }
   }
 }
 
 
 int main(int argc, char *argv[]) {
-  struct arguments arguments;
+  struct arguments args;
   char errbuf[PCAP_ERRBUF_SIZE];
-  char filter_expression[] = "tcp";
+  char filter_exp[] = "tcp";
   struct bpf_program filter;
   std::set<std::string> interfaces;
 
-  arguments.verbose = 0;
-  arguments.pDB = NULL;
-  arguments.pStmt = NULL;
-  argp_parse(&argp, argc, argv, 0, 0, &arguments);
-  if (arguments.interface.empty()) {
+  args.verbose = 0;
+  args.pDB = NULL;
+  args.pStmt = NULL;
+  argp_parse(&argp, argc, argv, 0, 0, &args);
+  if (args.interface.empty()) {
     print_usage();
   }
-  if (arguments.database.empty()) {
+  if (args.database.empty()) {
     print_usage();
   }
 
-  InitDbOrDie(arguments);
+  InitDbOrDie(args);
 
-  info_log("Collecting local addresses");
+  std::cout << "Collecting local addresses" << std::endl;
   interfaces.insert("any");
-  GetLocalAddressesAndIntfOrDie(arguments.local_ips, interfaces);
-  if (interfaces.find(arguments.interface) == interfaces.end()) {
-    critical_log("Interface %s is not a valid AF_INET interface", arguments.interface.c_str());
+  GetLocalAddressesAndIntfOrDie(args.local_ips, interfaces);
+  if (interfaces.find(args.interface) == interfaces.end()) {
+    std::cout << "Interface " << args.interface << " is not a valid " \
+        "AF_INET interface";
+    exit(EXIT_FAILURE);
   }
 
-  info_log("Checking capture interface \"%s\"", arguments.interface.c_str());
-  CheckIntfOrDie(arguments.interface, arguments);
+  std::cout << "Checkign capture interface " << args.interface << std::endl;
+  CheckIntfOrDie(args.interface, args);
 
-  info_log("Control-C to quit");
+  std::cout << "Control-C to quit" << std::endl;
   if (signal(SIGINT, SigHandler) == SIG_ERR) {
-    critical_log("Error while installing signal handler");
+    std::cout << "Error while installing signal handler" << std::endl;
+    exit(EXIT_FAILURE);
   }
   if (signal(SIGHUP, SigHandler) == SIG_ERR) {
-    critical_log("Error while installing signal handler");
+    std::cout << "Error while installing signal handler" << std::endl;
+    exit(EXIT_FAILURE);
   }
   if (signal(SIGQUIT, SigHandler) == SIG_ERR) {
-    critical_log("Error while installing signal handler");
+    std::cout << "Error while installing signal handler" << std::endl;
+    exit(EXIT_FAILURE);
   }
   if (signal(SIGTERM, SigHandler) == SIG_ERR) {
-    critical_log("Error while installing signal handler");
+    std::cout << "Error while installing signal handler" << std::endl;
+    exit(EXIT_FAILURE);
   }
 
-  p = pcap_create(arguments.interface.c_str(), errbuf);
+  p = pcap_create(args.interface.c_str(), errbuf);
   if (p == NULL) {
-    critical_log("Unable to open interface %s for capture: %s", arguments.interface.c_str(), errbuf);
+    std::cout << "Unable to open interface " << args.interface << " for " \
+        "capture: " << errbuf << std::endl;
+    exit(EXIT_FAILURE);
   }
   if (pcap_activate(p) != 0) {
-    critical_log("Unable to open interface %s for capture: %s", arguments.interface.c_str(), pcap_geterr(p));
+    std::cout << "Unable to open interface " << args.interface << " for " \
+        "capture: " << pcap_geterr(p) << std::endl;
+    exit(EXIT_FAILURE);
   }
-  arguments.pcap_dl_type = pcap_datalink(p);
-  if (pcap_compile(p, &filter, filter_expression, 0, PCAP_NETMASK_UNKNOWN) != 0) {
-    critical_log("Unable to compile filter expression: %s", pcap_geterr(p));
+  args.pcap_dl_type = pcap_datalink(p);
+  if (pcap_compile(p, &filter, filter_exp, 0, PCAP_NETMASK_UNKNOWN) != 0) {
+    std::cout << "Unable to compile filter expression: " << pcap_geterr(p) << std::endl;
+    exit(EXIT_FAILURE);
   }
   if (pcap_setfilter(p, &filter) != 0) {
-    critical_log("Unable to set filter: %s", pcap_geterr(p));
+    std::cout << "Unable to set filter: " << pcap_geterr(p) << std::endl;
+    exit(EXIT_FAILURE);
   }
-  pcap_loop(p, 0, ProcessPkt, reinterpret_cast<u_char*>(&arguments));
+  pcap_loop(p, 0, ProcessPkt, reinterpret_cast<u_char*>(&args));
   pcap_freecode(&filter);
   pcap_close(p);
-  sqlite3_finalize(arguments.pStmt);
-  sqlite3_close(arguments.pDB);
+  sqlite3_finalize(args.pStmt);
+  sqlite3_close(args.pDB);
   return 0;
 }
