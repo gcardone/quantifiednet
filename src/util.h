@@ -1,26 +1,15 @@
-#ifndef _qn_util
-#define _qn_util
+#ifndef qnutil_h_
+#define qnutil_h_
 
 #include <string>
 
 #include <netinet/in.h>
 #include <sys/time.h>
 
-std::string AddrToString(in_addr_t addr);
+std::string AddrToString(const in_addr_t addr);
 
 in_addr_t StringToAddr(const std::string& addr);
 
 std::string TimevalToString(const struct timeval& tv);
-
-/**
- * The memeq() function compares the first n bytes (each interpreted as
- * unsigned char) of the memory areas s1 and s2 for equality. It uses the
- * optimization described in Saunders, Richard T. "A Study in memcmp" to speed
- * up memory comparison for equality.
- * @param s1 First memory area
- * @param s2 Second memory area
- * @return 1 if the areas are equal, 0 if they are different.
- */
-int memeq(const void* s1, const void* s2, size_t n);
 
 #endif
