@@ -7,7 +7,8 @@
 #define ETHER_ADDR_LEN 6
 #define SLL_ADDR_LEN   8
 
-/* This struct is needed when capturing from the "any" interface. See
+/**
+ * This struct is needed when capturing from the "any" interface. See
  * http://www.tcpdump.org/linktypes/LINKTYPE_LINUX_SLL.html for more details
  */
 struct linux_sll_hdr {
@@ -18,7 +19,10 @@ struct linux_sll_hdr {
   uint16_t proto;
 };
 
-/* Header when capturing from ethernet interface */
+
+/**
+ * libpcap DLT_EN10MB 802.3 ethernet header
+ */
 struct ether_hdr {
   uint8_t dst[ETHER_ADDR_LEN];
   uint8_t src[ETHER_ADDR_LEN];
@@ -32,6 +36,9 @@ struct ether_hdr {
 #define IP_MF 0x2000       /* more fragments flag */
 #define IP_OFFMASK 0x1fff  /* mask for fragmenting bits */
 
+/**
+ * IPv4 header.
+ */
 struct ip_hdr {
   uint8_t vhl;
   uint8_t tos;
@@ -57,7 +64,9 @@ struct ip_hdr {
 #define TCP_ECE  0x40
 #define TCP_CWR  0x80
  
-
+/**
+ * TCP header.
+ */
 struct tcp_hdr {
   uint16_t sport;
   uint16_t dport;
