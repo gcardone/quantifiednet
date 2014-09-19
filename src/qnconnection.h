@@ -1,5 +1,5 @@
-#ifndef _qnconnection
-#define _qnconnection
+#ifndef qnconnection_h_
+#define qnconnection_h_
 
 #include <cstdint>
 #include <cstddef>
@@ -7,9 +7,19 @@
 
 #include <netinet/in.h>
 
+/**
+ * This class models a single TCP connection, uniquely identified by its
+ * endpoints' addresses and ports. It supports ordering, thus it is safe to use
+ * as map keys.
+ */
 class QNConnection {
 public:
-  QNConnection(in_addr_t addr_a,uint16_t port_a, in_addr_t addr_b, uint16_t port_b);
+  /**
+   * Constructs a new connection. addr_a and addr_b are compared for ordering
+   * thus QConnection(A, ..., B, ...) and QConnection(B, ..., A, ...) build the
+   * same object.
+   */
+  QNConnection(in_addr_t addr_a, uint16_t port_a, in_addr_t addr_b, uint16_t port_b);
   in_addr_t addr_a() const;
   in_addr_t addr_b() const;
   uint16_t port_a() const;
