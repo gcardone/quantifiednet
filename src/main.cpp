@@ -21,9 +21,9 @@
 
 const char *argp_program_version = "0.1";
 const char *argp_program_bug_address = "<ippatsuman+quantifiednet@gmail.com>";
-
 static char doc[] = "quantifiednet -- a minimal tracer of network connections";
 static char args_doc[] = "INTERFACE DB";
+
 
 static struct argp_option options[] = {
   {"INTERFACE",   0, 0,       OPTION_DOC, "Interface to listen on (e.g., eth0, any to listen on all available interfaces)",  1},
@@ -35,31 +35,32 @@ static struct argp_option options[] = {
 
 struct arguments
 {
-  std::set<in_addr_t> local_ips;
-  std::string database;
-  std::string interface;
-  sqlite3* pDB;
-  int pcap_dl_type;
-  sqlite3_stmt* pStmt;
-  std::map<QNConnection, QNFlow> traffic;
-  int verbose;
+  std::set<in_addr_t> local_ips; // set of local IPs
+  std::string dbpath;            // URL of the destination SQLite db
+  std::string interface;         // sniffing network interface
+  sqlite3* pDB;                  // SQlite db
+  int pcap_dl_type;              // data link type of the network interface
+  sqlite3_stmt* pStmt;           // prepared stmt to insert connection data
+  std::map<QNConnection, QNFlow> traffic; // tracked connections
+  int verbose;                   // 1 for verbose mode
 };
+
 
 static error_t parse_opt (int key, char *arg, struct argp_state *state)
 {
-  struct arguments *arguments = static_cast<struct arguments*>(state->input);
+  struct arguments *args = static_cast<struct arguments*>(state->input);
   switch (key) {
     case 'v':
-      arguments->verbose = 1;
+      args->verbose = 1;
       break;
     case ARGP_KEY_ARG:
       if (state->arg_num > 2) {
         argp_usage(state);
       }
       if (state->arg_num == 0) {
-        arguments->interface = arg;
+        args->interface = arg;
       } else {
-        arguments->database = arg;
+        args->dbpath = arg;
       }
       break;
     case ARGP_KEY_END:
@@ -72,14 +73,23 @@ static error_t parse_opt (int key, char *arg, struct argp_state *state)
   return 0;
 }
 
+
 static struct argp argp = { options, parse_opt, args_doc, doc, NULL, NULL, NULL};
+
 
 static void print_usage(void) {
   argp_help(&argp, stderr, ARGP_HELP_DOC, 0);
 }
 
-static bool InitDbOrDie(struct arguments& arguments) {
-  std::string file_uri;
+
+/**
+ * Inits the target SQLite database. A prepared statement to quickly insert
+ * traffic data in the database gets stored in the pStms field of arg. It
+ * prints an error message and terminates the process if anything goes wrong
+ * (e.g., the file is not accessible).
+ * @param args Arguments structure
+ */
+static void InitDbOrDie(struct arguments& args) {
   std::string create_table =
     "create table if not exists tcp_connections (id integer primary key, " \
     "locip text not null, locport integer not null, remip text not null, " \
@@ -92,10 +102,9 @@ static bool InitDbOrDie(struct arguments& arguments) {
   int rc;
   sqlite3 *pDB;
   sqlite3_stmt *pStmt;
-  file_uri = "file:" + arguments.database;
-  std::cout << "Using " << file_uri << " as Sqlite3 db" << std::endl;
+  std::cout << "Using " << args.dbpath << " as Sqlite3 db" << std::endl;
   sqlite3_config(SQLITE_CONFIG_URI, 1);
-  rc = sqlite3_open_v2(file_uri.c_str(), &pDB, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_URI, NULL);
+  rc = sqlite3_open_v2(args.dbpath.c_str(), &pDB, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_URI, NULL);
   if (rc != SQLITE_OK) {
     sqlite3_close(pDB);
     std::cout << "Error: " << sqlite3_errstr(rc) << std::endl;
@@ -119,18 +128,23 @@ static bool InitDbOrDie(struct arguments& arguments) {
   }
 
   sqlite3_finalize(pStmt);
-  rc = sqlite3_prepare_v2(pDB, insert_query.c_str(), insert_query.length(), &(arguments.pStmt), NULL);
+  rc = sqlite3_prepare_v2(pDB, insert_query.c_str(), insert_query.length(), &(args.pStmt), NULL);
   if (rc != SQLITE_OK) {
-    sqlite3_finalize(arguments.pStmt);
+    sqlite3_finalize(args.pStmt);
     sqlite3_close(pDB);
     std::cout << "Error: " << sqlite3_errstr(rc) << std::endl;
     exit(EXIT_FAILURE);
   }
-  arguments.pDB = pDB;
-  arguments.database = file_uri;
-  return true;
+  args.pDB = pDB;
 }
 
+/**
+ * Retrieves all available AF_INET (IPv4) addresses and interfaces and stores
+ * them in the function arguments. Kills the process in case getifaddrs(3)
+ * fails.
+ * @param addresses Where retrieved IPv4 addresses are stored.
+ * @param interfaces Where retrieved interfaces are stored.
+ */
 static void GetLocalAddressesAndIntfOrDie(std::set<in_addr_t>& addresses, std::set<std::string>& interfaces) {
   struct ifaddrs *ifaddr, *ifa;
   int family;
@@ -158,7 +172,16 @@ static void GetLocalAddressesAndIntfOrDie(std::set<in_addr_t>& addresses, std::s
 }
 
 
-static void CheckIntfOrDie(const std::string& ifa, struct arguments& arg) {
+/**
+ * Checks that the interface stored in the arg parameter can be accessed by
+ * libpcap (i.e., it exists and we have enough privileges to access it) and
+ * that it is of a supported data link type (currently supported: Ethernet
+ * and Linux "cooked" captured encapsulation. The interface data link type
+ * is stored in the arg structure.
+ * @param ifa Interface to check.
+ * @param args Arguments structure.
+ */
+static void CheckIntfOrDie(const std::string& ifa, struct arguments& args) {
   char errbuf[PCAP_ERRBUF_SIZE];
   pcap_t *pcap;
   int dl_type;
@@ -180,7 +203,7 @@ static void CheckIntfOrDie(const std::string& ifa, struct arguments& arg) {
         "currently supported";
     exit(EXIT_FAILURE);
   }
-  arg.pcap_dl_type = dl_type;
+  args.pcap_dl_type = dl_type;
   pcap_close(pcap);
 }
 
@@ -188,6 +211,10 @@ static void CheckIntfOrDie(const std::string& ifa, struct arguments& arg) {
 // evil global goes here: sorry, I need it in the signal handler.
 static pcap_t *p;
 
+/**
+ * Signal handler that breaks packet capture loop
+ * @param sig Received signal.
+ */
 static void SigHandler(int sig) {
   if (p != NULL) {
     pcap_breakloop(p);
@@ -195,7 +222,12 @@ static void SigHandler(int sig) {
 }
 
 
-static void StoreFlowInDB(const arguments& args, const QNFlow& flow) {
+/**
+ * Stores the data of the TCP flow in the SQLite database.
+ * @param flow Flow to store.
+ * @param args Program arguments.
+ */
+static void StoreFlowInDB(const QNFlow& flow, const arguments& args) {
   const QNConnection& conn = flow.connection();
   sqlite3_stmt* pStmt = args.pStmt;
   std::string srcip;
@@ -209,6 +241,7 @@ static void StoreFlowInDB(const arguments& args, const QNFlow& flow) {
   uint64_t durationmsec;
   int rc;
 
+  // find which one of the TCP endpoints is a local interface
   if (args.local_ips.find(conn.addr_a()) != args.local_ips.end()) {
     srcip = AddrToString(conn.addr_a());
     srcport = ntohs(conn.port_a());
@@ -243,7 +276,13 @@ static void StoreFlowInDB(const arguments& args, const QNFlow& flow) {
   sqlite3_reset(pStmt);
 }
 
-
+/**
+ * Processes a single captured packet. See pcap_loop(3) for an in depth
+ * description of function parameters.
+ * @param user Pointer to a struct arguments.
+ * @param h Pcap packet header.
+ * @param bytes Captured packet, including data link header.
+ */
 static void ProcessPkt(unsigned char *user, const struct pcap_pkthdr *h, const u_char *bytes) {
   struct arguments* args;
   const struct ip_hdr* ip_hdr;
@@ -253,7 +292,8 @@ static void ProcessPkt(unsigned char *user, const struct pcap_pkthdr *h, const u
   struct timeval now;
 
   args = reinterpret_cast<struct arguments*>(user);
-  
+ 
+  // check whether the packet data link header is Linux SLL or Ethernet
   if (args->pcap_dl_type == DLT_LINUX_SLL) {
     ip_hdr = reinterpret_cast<const struct ip_hdr*>(bytes + sizeof(struct linux_sll_hdr));
     datalink_size = sizeof(struct linux_sll_hdr);
@@ -272,7 +312,11 @@ static void ProcessPkt(unsigned char *user, const struct pcap_pkthdr *h, const u
   QNConnection conn = QNConnection(ip_hdr->src, tcp_hdr->sport, ip_hdr->dest, tcp_hdr->dport);
   auto pflow = args->traffic.find(conn);
   if ((tcp_hdr->flags & TCP_SYN) && (tcp_hdr->flags & TCP_ACK)) {
-    // new connection
+    // new connection detected
+    // A packet with SYN and ACK flags is sent as response to a SYN packet
+    // Formally, the TCP three way handshake is not complete yet, so this might
+    // going to be an incomplete connection. However, this is a simple and
+    // robust enough approach.
     struct timeval now;
     gettimeofday(&now, NULL);
     QNFlow flow = QNFlow(conn, now);
@@ -284,7 +328,11 @@ static void ProcessPkt(unsigned char *user, const struct pcap_pkthdr *h, const u
     // tracked connection
     if ((tcp_hdr->flags & TCP_FIN) || (tcp_hdr->flags & TCP_RST)) {
       // closed connection
-      StoreFlowInDB(*args, pflow->second);
+      // A TCP connection is closed when a packet with the RST or FIN flag is
+      // sent/received. Actually, a FIN flag closes only one way of the
+      // connection. Again, this is an oversimplification, still it works
+      // decently.
+      StoreFlowInDB(pflow->second, *args);
       if (args->verbose) {
         std::cout << "Closed connection: " << conn << std::endl;
       }
@@ -301,7 +349,7 @@ static void ProcessPkt(unsigned char *user, const struct pcap_pkthdr *h, const u
   gettimeofday(&now, NULL);
   for (auto it = args->traffic.cbegin(); it != args->traffic.cend();) {
     if ((now.tv_sec - it->second.end_time().tv_sec) > 120) {
-      StoreFlowInDB(*args, it->second);
+      StoreFlowInDB(it->second, *args);
       if (args->verbose) {
         std::cout << "Connection timed out: " << it->first;
       }
@@ -327,7 +375,7 @@ int main(int argc, char *argv[]) {
   if (args.interface.empty()) {
     print_usage();
   }
-  if (args.database.empty()) {
+  if (args.dbpath.empty()) {
     print_usage();
   }
 
