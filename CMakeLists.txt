@@ -12,7 +12,7 @@ include_directories(${PROJECT_BINARY_DIR})
 include_directories(${SQLITE3_INCLUDE_DIRS})
 include_directories(${PCAP_INCLUDE_DIR})
 
-#set(CMAKE_REQUIRED_LIBRARIES ${SQLITE3_LIBRARIES} ${PCAP_LIBRARY})
+set(CMAKE_REQUIRED_LIBRARIES ${SQLITE3_LIBRARIES} ${PCAP_LIBRARY})
 add_executable(quantifiednet ${SOURCES})
 target_link_libraries(quantifiednet "-lsqlite3")
 target_link_libraries(quantifiednet "-lpcap")
