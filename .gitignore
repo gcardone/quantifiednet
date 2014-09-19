@@ -29,7 +29,6 @@ CMakeFiles
 Makefile
 cmake_install.cmake
 install_manifest.txt
-config.h
 
 ### YouCompleteMe ###
 .ycm_extra_conf.py
