@@ -68,3 +68,9 @@ Table `tcp_connections`:
 * durationmsec integer not null
 
 Dates are stored in the `YYYY-MM-DD HH:MM:SS.SSS` format and can be accessed using SQLite date and time functions. For more information please refer to [SQLite documentation](http://www.sqlite.org/lang_datefunc.html).
+
+
+Todo
+----
+* Add support for UDP connections
+* Support half-opened TCP connections
