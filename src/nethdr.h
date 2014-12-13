@@ -81,14 +81,14 @@ struct ip_hdr {
 
 #define TCP_DOFF(th) ((th)->off_rsvd_ns >> 4)
 #define TCP_NS(th) ((th)->off_rsvd_ns & 0x01)
-#define TCP_FIN  0x01
-#define TCP_SYN  0x02
-#define TCP_RST  0x04
+#define TCP_FIN 0x01
+#define TCP_SYN 0x02
+#define TCP_RST 0x04
 #define TCP_PSH 0x08
-#define TCP_ACK  0x10
-#define TCP_URG  0x20
-#define TCP_ECE  0x40
-#define TCP_CWR  0x80
+#define TCP_ACK 0x10
+#define TCP_URG 0x20
+#define TCP_ECE 0x40
+#define TCP_CWR 0x80
  
 /**
  * TCP header.
